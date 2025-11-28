@@ -1,8 +1,10 @@
 from flask import Flask, request, send_file
+from flask_cors import CORS
 import os
 from backend.processor import extraer_productos, generar_excel
 
 app = Flask(__name__)
+CORS(app)  # Habilita CORS para todas las rutas
 
 UPLOAD_FOLDER = "uploads"
 OUTPUT_FOLDER = "outputs"
