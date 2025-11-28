@@ -1,6 +1,6 @@
 from flask import Flask, request, send_file
 import os
-from processor import extraer_productos, generar_excel
+from backend.processor import extraer_productos, generar_excel
 
 app = Flask(__name__)
 
