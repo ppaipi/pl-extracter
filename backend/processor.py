@@ -18,53 +18,55 @@ def precio_venta(precio):
         p = precio * 2
     return redondear_10(p)
 
-# -- extracción de productos --
+# Regex generales
+codigo_regex = r"[A-Z]{4,5}\d{2}"
+precio_regex = r"\d{1,3}(?:\.\d{3})*,\d{2}"  # acepta 11.234,56 ó 234,50
+
+def limpiar_precio(p):
+    """ Convertir 11.234,56 -> 11234.56 """
+    p = p.replace(".", "").replace(",", ".")
+    return float(p)
+
 def extraer_productos(path_pdf):
     productos = []
 
-    codigo_regex = r"[A-Z]{4,5}\d{2}"
-
     with pdfplumber.open(path_pdf) as pdf:
         for page in pdf.pages:
-            tables = page.extract_tables()
-            for table in tables:
-                for row in table:
-                    for cell in row:
-                        if cell is None:
-                            continue
+            text = page.extract_text() or ""
+            lineas = text.split("\n")
 
-                        texto = cell.replace("\n", " ")
+            for linea in lineas:
+                codigos = re.findall(codigo_regex, linea)
+                if not codigos:
+                    continue
 
-                        # buscar código
-                        codigos = re.findall(codigo_regex, texto)
-                        if not codigos:
-                            continue
+                codigo = codigos[0]
 
-                        for codigo in codigos:
-                            try:
-                                # nombre entre código y (21.00)
-                                nombre = texto.split(codigo)[1]
-                                nombre = nombre.split("(21.00)")[0].strip()
+                # encontrar precios (puede haber 1 o 2)
+                precios = re.findall(precio_regex, linea)
+                if not precios:
+                    continue
 
-                                # números al final
-                                nums = re.findall(r"\d+\.\d+", texto)
-                                if len(nums) < 2:
-                                    continue
+                precio_unitario = limpiar_precio(precios[-1])  # último precio de la línea
 
-                                precio_unitario = float(nums[-2])
+                # nombre = texto entre código y el primer precio encontrado
+                idx_codigo = linea.find(codigo) + len(codigo)
+                idx_precio = linea.find(precios[0])
+                nombre = linea[idx_codigo:idx_precio].strip()
 
-                                productos.append({
-                                    "codigo": codigo,
-                                    "nombre": nombre,
-                                    "precio": precio_unitario,
-                                    "precio_venta": precio_venta(precio_unitario)
-                                })
-                            except:
-                                continue
+                # limpiar nombre (dobles espacios, basura)
+                nombre = re.sub(r"\s+", " ", nombre)
+
+                productos.append({
+                    "codigo": codigo,
+                    "nombre": nombre,
+                    "precio": precio_unitario,
+                    "precio_venta": precio_venta(precio_unitario)
+                })
 
     return productos
 
-# -- exportar Excel --
+
 def generar_excel(productos, output_path):
     df = pd.DataFrame(productos)
     df.to_excel(output_path, index=False)
