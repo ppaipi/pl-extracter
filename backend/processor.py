@@ -3,7 +3,9 @@ import re
 import math
 import pandas as pd
 
-# -- reglas de precio --
+# -----------------------------
+# REGLAS DE PRECIO
+# -----------------------------
 def redondear_10(n):
     return math.ceil(n / 10) * 10
 
@@ -18,55 +20,73 @@ def precio_venta(precio):
         p = precio * 2
     return redondear_10(p)
 
-# Regex generales
-codigo_regex = r"[A-Z]{4,5}\d{2}"
-precio_regex = r"\d{1,3}(?:\.\d{3})*,\d{2}"  # acepta 11.234,56 ó 234,50
 
-def limpiar_precio(p):
-    """ Convertir 11.234,56 -> 11234.56 """
-    p = p.replace(".", "").replace(",", ".")
-    return float(p)
-
+# -----------------------------
+# EXTRACCIÓN PDF
+# -----------------------------
 def extraer_productos(path_pdf):
     productos = []
 
+    codigo_regex = r"[A-Z]{4,5}\d{2}"
+
+    # precios: acepta 11683,92 o 21040 o 11683.92
+    precio_regex = r"\d+(?:[.,]\d+)?"
+
     with pdfplumber.open(path_pdf) as pdf:
         for page in pdf.pages:
-            text = page.extract_text() or ""
-            lineas = text.split("\n")
+            tables = page.extract_tables()
+            for table in tables:
+                for row in table:
+                    for cell in row:
+                        if not cell:
+                            continue
 
-            for linea in lineas:
-                codigos = re.findall(codigo_regex, linea)
-                if not codigos:
-                    continue
+                        texto = cell.replace("\n", " ").strip()
 
-                codigo = codigos[0]
+                        # 1) Buscar código
+                        codigos = re.findall(codigo_regex, texto)
+                        if not codigos:
+                            continue
 
-                # encontrar precios (puede haber 1 o 2)
-                precios = re.findall(precio_regex, linea)
-                if not precios:
-                    continue
+                        for codigo in codigos:
+                            try:
+                                # 2) Detectar precios (2 últimos números)
+                                nums = re.findall(precio_regex, texto)
 
-                precio_unitario = limpiar_precio(precios[-1])  # último precio de la línea
+                                if len(nums) < 2:
+                                    continue
 
-                # nombre = texto entre código y el primer precio encontrado
-                idx_codigo = linea.find(codigo) + len(codigo)
-                idx_precio = linea.find(precios[0])
-                nombre = linea[idx_codigo:idx_precio].strip()
+                                # precios en formato seguro
+                                precio_unitario_str = nums[-2].replace(",", ".")
+                                precio_unitario = float(precio_unitario_str)
 
-                # limpiar nombre (dobles espacios, basura)
-                nombre = re.sub(r"\s+", " ", nombre)
+                                # 3) Nombre: texto entre código y primer precio
+                                pos_codigo = texto.find(codigo)
+                                pos_precio = texto.find(nums[-2])
 
-                productos.append({
-                    "codigo": codigo,
-                    "nombre": nombre,
-                    "precio": precio_unitario,
-                    "precio_venta": precio_venta(precio_unitario)
-                })
+                                nombre = texto[pos_codigo + len(codigo):pos_precio].strip()
+
+                                if nombre == "":
+                                    nombre = "(SIN NOMBRE)"
+
+                                productos.append({
+                                    "codigo": codigo,
+                                    "nombre": nombre,
+                                    "precio": precio_unitario,
+                                    "precio_venta": precio_venta(precio_unitario)
+                                })
+
+                            except Exception as e:
+                                print("Error en fila:", texto)
+                                print("Detalle:", e)
+                                continue
 
     return productos
 
 
+# -----------------------------
+# GENERAR EXCEL
+# -----------------------------
 def generar_excel(productos, output_path):
     df = pd.DataFrame(productos)
     df.to_excel(output_path, index=False)
