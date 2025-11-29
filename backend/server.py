@@ -1,13 +1,19 @@
 from flask import Flask, request, send_file
 from flask_cors import CORS
 import os
-from backend.processor import extraer_productos, generar_excel
+from processor import extraer_productos, generar_excel
 
 app = Flask(__name__)
-CORS(app)  # Habilita CORS para todas las rutas
+CORS(app)
 
-UPLOAD_FOLDER = "uploads"
-OUTPUT_FOLDER = "outputs"
+# Carpeta base donde está ESTE archivo
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+
+# Carpetas internas del backend
+UPLOAD_FOLDER = os.path.join(BASE_DIR, "uploads")
+OUTPUT_FOLDER = os.path.join(BASE_DIR, "outputs")
+
+# Crear carpetas si no existen
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs(OUTPUT_FOLDER, exist_ok=True)
 
