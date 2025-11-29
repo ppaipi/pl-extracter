@@ -12,7 +12,8 @@ document.getElementById("processBtn").addEventListener("click", async () => {
     const formData = new FormData();
     formData.append("file", fileInput.files[0]);
 
-    const res = await fetch("https://pl-extracter.onrender.com/extract", {
+    // 🔥 Cambiá /extract por /upload
+    const res = await fetch("https://pl-extracter.onrender.com/upload", {
         method: "POST",
         body: formData
     });
